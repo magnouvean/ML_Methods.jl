@@ -15,7 +15,7 @@ function K_λ(λ)
     end
     function K(x0, x)
         x̂ = (x - x0) / λ
-        x̂² = dot(x̂, x̂)
+        x̂² = x̂ ⋅ x̂
         x̂² ≤ 1 ? 3 / 4 * (1 - x̂²) : 0
     end
     K
@@ -33,7 +33,7 @@ function predict(ks::KernelSmoother, X_0::Array)
     ŷ = Matrix(undef, size(X_0, 1), size(X_0, 2))
     for i in 1:size(X_0, 1)
         a = sum((ks.K(X_0[i, :], ks.X[j, :]) * ks.y[j, :]) for j in 1:size(ks.X, 1))
-        b = sum((ks.K(X_0[i, :], ks.X[i, :]) for j in 1:size(X, 1)))
+        b = sum((ks.K(X_0[i, :], ks.X[j, :]) for j in 1:size(ks.X, 1)))
 
         for j in 1:length(a)
             ŷ[i, j] = a[j] / b
@@ -42,13 +42,6 @@ function predict(ks::KernelSmoother, X_0::Array)
     ŷ
 end
 
-
-X = [1.22 0.0; 2.0 0.0; 3.4482 0.0; 4.3221 0.0; 5.000421 0.0; 6.629 0.0; 8.49122 0.0; 10.0491 0.0]
-y = [2.4 0.1; 4.0 0.1; 6.6 0.1; 8.4 0.1; 10.0 0.1; 13.2 0.1; 16.8 0.1; 20.0 0.1]
-
-ks = KernelSmoother(X, y, K_λ(10))
-ŷ = predict(ks, X)
-println(ŷ)
 
 """
 Leave one out cross validation for determining λ in Epanechnikov kernel
@@ -69,11 +62,6 @@ function CV_Epanechnikov(λ_list::Vector{Float64}, X::Array, y::Array)
     mse_λ
 end
 
-λ_list = Vector(range(0.1, 20, step=0.5))
-X = [1.0; 2.0; 3.0; 4.0; 5.0; 6.0; 7.0; 8.0]
-y = 2 / 3 .* X .^ 2 - 4 .* X .+ 6
-λ_cvs = CV_Epanechnikov(λ_list, X, y)
-println(λ_cvs)
 
 function EpanechnikovCV(X, y, λ_list)
     λ_cv = CV_Epanechnikov(λ_list, X, y)
@@ -82,8 +70,12 @@ function EpanechnikovCV(X, y, λ_list)
     KernelSmoother(X, y, K_λ(λ_optim))
 end
 
+# Demo for checking things work properly
+include("data.jl")
+using Plots
+λ_list = Vector(range(0.1, 20, step=0.5))
 ks = EpanechnikovCV(X, y, λ_list)
-ŷ = predict(ks, X)
-println(y)
-println(ŷ)
-println("$(sum((ŷ - y).^2) ./ length(y))")
+X_0 = Vector(range(0.0, 1.0, length=101))
+ŷ = predict(ks, X_0)
+scatter(X, y, label="y")
+display(plot!(X_0, ŷ[:, 1], label="ŷ"))
