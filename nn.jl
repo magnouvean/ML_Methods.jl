@@ -99,9 +99,9 @@ function calculate_β_grad(net::NeuralNet, y::Array, ŷ::Array, Z::Array, T::Ar
     for j in 0:length(β_grad)-1
         for i in 1:size(y, 1)
             if j == 0
-                β_grad[1] += -2 * (y[i, :] - ŷ[i, :]) ⋅ net.output_function_deriv.(T[i, :]) + 2 * λ * net.β[1]
+                β_grad[1] += net.loss_function_deriv(y[i, :], ŷ[i, :]) ⋅ net.output_function_deriv.(T[i, :]) + 2 * λ * net.β[1]
             else
-                β_grad[j+1] += -2 * (y[i, :] - ŷ[i, :]) ⋅ net.output_function_deriv.(T[i, :]) * Z[i, j] + 2 * λ * net.β[j+1]
+                β_grad[j+1] += net.loss_function_deriv(y[i, :], ŷ[i, :]) ⋅ net.output_function_deriv.(T[i, :]) * Z[i, j] + 2 * λ * net.β[j+1]
             end
         end
     end
@@ -120,7 +120,7 @@ function calculate_α_grad(net::NeuralNet, y::Array, ŷ::Array, T::Array, p::In
         for j in 1:size(α_grad, 2)
             for i in 1:size(y, 1)
                 a = net.output_function_deriv(T[i, :]) * net.β[j] * net.activation_function_deriv(sum((net.α[h̃, j] * X[i, h̃] for h̃ in 1:p))) * X[i, h]
-                α_grad[h, j] += -2 * (y[i, :] - ŷ[i, :]) ⋅ a + 2 * λ * net.α[h, j]
+                α_grad[h, j] += net.loss_function_deriv(y[i, :], ŷ[i, :]) ⋅ a + 2 * λ * net.α[h, j]
             end
         end
     end
@@ -139,13 +139,13 @@ function train(net::NeuralNet, X::Array, y::Array, γ::Float64=0.01, epochs::Int
     net.β = 2 * (rand(Float64, net.hidden_layer_size + 1) .- 0.5) * net.max_rand_weights
 
     for epoch in 1:epochs
-        loss = calculate_loss(net, X, y)
+        loss = calculate_loss(net, X, y, λ)
         println("Epoch $epoch: (loss $loss)")
 
 
         Z = calculate_Z(net, X)
         T = calculate_T(net, Z)
-        ŷ = forward(net, X) # Can be optimized
+        ŷ = net.output_function(T) # since this is what's returned from forward(net, X)
 
         α_grad = calculate_α_grad(net, y, ŷ, T, size(X, 2), λ)
         β_grad = calculate_β_grad(net, y, ŷ, Z, T, λ)
@@ -164,7 +164,7 @@ X /= maximum(X)
 X_0 = Vector(range(0.0, 1.0, length=101))
 
 net = NeuralNet(10, 0.0001)
-train(net, X, y, 0.0001, 5000, 0.0)
+train(net, X, y, 0.002, 20000, 0.0)
 ŷ = predict(net, X_0)
 
 scatter(X, y, label="y")
